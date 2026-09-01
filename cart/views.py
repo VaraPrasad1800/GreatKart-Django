@@ -1,5 +1,5 @@
 from django.shortcuts import render,redirect,get_object_or_404
-from store.models import Product
+from store.models import Product,ProductVariant
 from . models import Cart,CartItem
 from django.core.exceptions import ObjectDoesNotExist
 from django.http import HttpResponse
@@ -12,12 +12,10 @@ def _cart_id(request):
         cart = request.session.create()
     return cart
 
-def add_cart(request,product_id):
-
-    color = request.GET['color']
-    size  = request.GET['size']
-
-    product = Product.objects.get(id=product_id)
+def add_cart(request,variant_id):
+    variant = ProductVariant.objects.get(
+        id = variant_id
+    )
 
     try:
         cart=Cart.objects.get(cart_id = _cart_id(request))
@@ -28,12 +26,12 @@ def add_cart(request,product_id):
         cart.save()
 
     try:
-        cart_item = CartItem.objects.get(product=product,cart=cart)
+        cart_item = CartItem.objects.get(variant=variant,cart=cart)
         cart_item.quantity += 1
         cart_item.save()
     except CartItem.DoesNotExist:
         cart_item = CartItem.objects.create(
-            product = product,
+            variant = variant,
             cart = cart,
             quantity = 1 
         )
@@ -41,10 +39,10 @@ def add_cart(request,product_id):
 
     return redirect('cart')
 
-def remove_cart(request,product_id):
+def remove_cart(request,variant_id):
     cart = Cart.objects.get(cart_id = _cart_id(request))
-    product = get_object_or_404(Product,id = product_id)
-    cart_item = CartItem.objects.get(product=product,cart = cart)
+    Variant = get_object_or_404(ProductVariant,id = variant_id)
+    cart_item = CartItem.objects.get(variant=Variant,cart = cart)
 
     if cart_item.quantity > 1:
         cart_item.quantity -= 1
@@ -54,23 +52,25 @@ def remove_cart(request,product_id):
 
     return redirect('cart')
 
-def remove_cart_item(request,product_id):
+def remove_cart_item(request,variant_id):
     cart = Cart.objects.get(cart_id = _cart_id(request))
-    product = get_object_or_404(Product,id = product_id)
-    cart_item = CartItem.objects.get(product=product,cart = cart)
+    Variant = get_object_or_404(ProductVariant,id = variant_id)
+    cart_item = CartItem.objects.get(ProductVariant=Variant,cart = cart)
 
     cart_item.delete()
 
     return redirect('cart')
 
 def cart(request,total = 0,quantity = 0,cart_items = None):
+    tax = 0
+    grand_total = 0
     try:
         cart = Cart.objects.get(cart_id = _cart_id(request))
         cart_items = CartItem.objects.filter(cart = cart,isAvailable = True)
 
         for cart_item in cart_items :
             quantity +=  cart_item.quantity
-            total    +=  (cart_item.product.price * cart_item.quantity)
+            total    +=  (cart_item.variant.price * cart_item.quantity)
 
         tax = (2*total)/100
         grand_total = total + tax

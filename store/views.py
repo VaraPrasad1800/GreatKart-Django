@@ -1,5 +1,5 @@
 from django.shortcuts import render,get_object_or_404
-from .models import Product
+from .models import Product,ProductColor,ProductVariant
 from category.models import Category
 from cart.models import CartItem
 from cart.views import _cart_id
@@ -17,12 +17,14 @@ def store(request,category_slug = None):
         paginator   = Paginator(products,3)
         page_number = request.GET.get("page")
         page_obj    = paginator.get_page(page_number)
+        products_count = products.count()
     else :
         products = Product.objects.all().filter(isAvailable = True)
         paginator   = Paginator(products,3)
         page_number = request.GET.get("page")
         page_obj    = paginator.get_page(page_number)
         products_count = products.count()
+
 
     
     context = {
@@ -36,13 +38,44 @@ def store(request,category_slug = None):
 def product_details(request,category_slug,product_slug):
     try:
         single_product = Product.objects.get(category__slug = category_slug,slug=product_slug)
-        in_cart = CartItem.objects.filter(cart__cart_id = _cart_id(request),product = single_product).exists()
+        
+
+        product_colors = ProductColor.objects.filter(product = single_product)
+
+        color_id = request.GET.get('color')
+        variant_id = request.GET.get('variant')
+
+        if color_id:
+            selected_color = product_colors.get(id=color_id)
+        else:
+            selected_color = product_colors.first()
+
+        variants = ProductVariant.objects.filter(
+            product_color=selected_color,
+            is_active=True
+        )
+
+        if variant_id:
+            try:
+                selected_variant = variants.get(id = variant_id)
+            except ProductVariant.DoesNotExist:
+                selected_variant = variants.first()
+        else:
+            selected_variant = variants.first()
+
+
+
+        in_cart = CartItem.objects.filter(cart__cart_id = _cart_id(request),variant = selected_variant).exists()
     except Exception as e:
         raise e
 
     context = {
         'single_product' : single_product,
-        'in_cart' : in_cart
+        'in_cart' : in_cart,
+        'product_colors': product_colors,
+        'selected_color': selected_color,
+        'variants': variants,
+        'selected_variant' : selected_variant,
     }
     return render(request,'store/product_details.html',context)
 
@@ -59,3 +92,5 @@ def search(request):
         'products_count' : products_count,
     }    
     return render(request,'store/store.html',context) 
+
+

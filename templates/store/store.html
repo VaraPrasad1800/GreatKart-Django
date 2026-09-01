@@ -141,15 +141,21 @@
 		<figure class="card card-product-grid">
 			<div class="img-wrap"> 
 				
-				<a href="{{ product.get_url }}" class="img-wrap"> <img src="{{ product.images.url }}"> </a>
+				<a href="{{ product.get_url }}" class="img-wrap"> 
+					{% with color=product.first_color %}
+    					{% if color and color.images.first %}
+        				<img src="{{ color.images.first.image.url }}">
+    					{% endif %}
+					{% endwith %}
+				</a>
 				
 			</div> <!-- img-wrap.// -->
 			<figcaption class="info-wrap">
 				<div class="fix-height">
 					<a href="{{ product.get_url }}" class="title">{{ product.product_name }}</a>
-					<div class="price-wrap mt-2">
+					<!-- <div class="price-wrap mt-2">
 						<span class="price">${{ product.price }}</span>
-					</div> <!-- price-wrap.// -->
+					</div> price-wrap.// -->
 				</div>
 				<a href="{{ product.get_url }}" class="btn btn-block btn-primary"> View Details </a>
 			</figcaption>

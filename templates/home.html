@@ -32,10 +32,17 @@
 	{% for product in products %}
 	<div class="col-md-3">
 		<div class="card card-product-grid">
-			<a href="{{ product.get_url }}" class="img-wrap"> <img src="{{ product.images.url }}"> </a>
+			<a href="{{ product.get_url }}" class="img-wrap">
+					{% with color=product.first_color %}
+    					{% if color and color.images.first %}
+        				<img src="{{ color.images.first.image.url }}">
+    					{% endif %}
+					{% endwith %}
+			</a>
 			<figcaption class="info-wrap">
+				
 				<a href="{{ product.get_url }}" class="title">{{ product.product_name }}</a>
-				<div class="price mt-1">$	{{ product.price }}</div> <!-- price-wrap.// -->
+				<!--<div class="price mt-1">$	{{ product.price }}</div>  --> 
 			</figcaption>
 		</div>
 	</div> <!-- col.// -->
