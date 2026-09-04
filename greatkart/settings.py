@@ -41,6 +41,9 @@ INSTALLED_APPS = [
     'accounts',
     'store',
     'cart',
+    # API framework
+    'rest_framework',
+    'rest_framework_simplejwt',
 ]
 
 MIDDLEWARE = [
@@ -67,6 +70,7 @@ TEMPLATES = [
                 'django.contrib.messages.context_processors.messages',
                 'category.context_processors.menu_links',
                 'cart.context_processors.counter',
+                'django.template.context_processors.csrf'
             ],
         },
     },
@@ -74,6 +78,16 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'greatkart.wsgi.application'
 AUTH_USER_MODEL =  'accounts.Account'
+
+# Django REST Framework - API configuration
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': (
+        'rest_framework_simplejwt.authentication.JWTAuthentication',
+    ),
+    'DEFAULT_PERMISSION_CLASSES': (
+        'rest_framework.permissions.AllowAny',
+    ),
+}
 
 
 # Database

@@ -47,8 +47,13 @@
 							<a href="{% url 'remove_cart' cart_item.variant.id %}" class="btn btn-light" type="button" id="button-plus"> <i class="fa fa-minus"></i> </a>
 							</div>
 							<input type="text" class="form-control"  value="{{cart_item.quantity}}">
+
 							<div class="input-group-append">
+							{% if cart_item.quantity < cart_item.variant.stock %}
 							<a href="{% url 'add_cart' cart_item.variant.id %}" class="btn btn-light" type="button" id="button-minus"> <i class="fa fa-plus"></i> </a>
+							{% else %}
+							<button class="btn btn-success" disabled>+</button>
+							{% endif %}
 							</div>
 						</div> <!-- input-group.// -->
 					</div> <!-- col.// -->

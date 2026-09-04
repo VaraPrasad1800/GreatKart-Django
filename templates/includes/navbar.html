@@ -37,7 +37,7 @@
 				<i class="fa fa-bars"></i> All category 
 			</button>
 			<div class="dropdown-menu">
-				<a href="{% url 'store' %}" class="title"><b>All Products</b></a>
+				<a class="dropdown-item" href="{% url 'store' %}" class="title"><b>All Products</b></a>
 				{% for category in links %}
 				<a class="dropdown-item" href="{{category.get_url}}">{{ category.category_name }}</a>
 				{% endfor %}
@@ -63,9 +63,13 @@
 				<div class="d-flex justify-content-end mb-3 mb-lg-0">
 					<div class="widget-header">
 						<small class="title text-muted">Welcome guest!</small>
-						<div> 
-							<a href="./signin.html">Sign in</a> <span class="dark-transp"> | </span>
-							<a href="./register.html"> Register</a>
+						<div>
+							{% if request.user.is_authenticated %}
+							<a href="{% url 'logout' %}">Logout</a>
+							{% else %}
+							<a href="{% url 'login' %}">Sign in</a> <span class="dark-transp"> | </span>
+							<a href="{% url 'register' %}"> Register</a>
+							{% endif %}
 						</div>
 					</div>
 					<a href="{% url 'cart' %}" class="widget-header pl-3 ml-3">
