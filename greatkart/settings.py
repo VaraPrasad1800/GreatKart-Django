@@ -41,20 +41,28 @@ INSTALLED_APPS = [
     'accounts',
     'store',
     'cart',
+    'orders',
+    'wishlist',
     # API framework
     'rest_framework',
     'rest_framework_simplejwt',
+    'corsheaders',
 ]
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
+    'corsheaders.middleware.CorsMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
+
+CORS_ALLOW_ALL_ORIGINS = True
+CORS_ALLOW_CREDENTIALS = True
+
 
 ROOT_URLCONF = 'greatkart.urls'
 
@@ -70,6 +78,7 @@ TEMPLATES = [
                 'django.contrib.messages.context_processors.messages',
                 'category.context_processors.menu_links',
                 'cart.context_processors.counter',
+                'wishlist.context_processors.wishlist_count',
                 'django.template.context_processors.csrf'
             ],
         },
@@ -87,6 +96,9 @@ REST_FRAMEWORK = {
     'DEFAULT_PERMISSION_CLASSES': (
         'rest_framework.permissions.AllowAny',
     ),
+    # API list endpoints come paginated: {"count": N, "next": url, "previous": url, "results": [...]}
+    'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
+    'PAGE_SIZE': 9,
 }
 
 
@@ -135,17 +147,27 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
 
-STATIC_URL = 'static/'
-STATIC_ROOT  = BASE_DIR/'static'
+STATIC_URL = '/static/'
+STATIC_ROOT  = BASE_DIR / 'static'
 STATICFILES_DIRS = [
     'greatkart/static',
 ]
-# media files configuration
-STATIC_URL = '/media/'
-STATIC_ROOT  = BASE_DIR/'media'
+
+# Media files (user uploads: product images, category images)
+MEDIA_URL = '/media/'
+MEDIA_ROOT = BASE_DIR / 'media'
 
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+from datetime import timedelta
+
+SIMPLE_JWT = {
+    'ACCESS_TOKEN_LIFETIME': timedelta(hours=1),      # default is 5 minutes
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=7),      # default is 1 day
+    'ROTATE_REFRESH_TOKENS': False,
+    'BLACKLIST_AFTER_ROTATION': True,
+}

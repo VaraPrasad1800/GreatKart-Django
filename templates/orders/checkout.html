@@ -1,0 +1,128 @@
+{% extends 'base.html' %}
+
+{% load static %}
+
+{% block content %}
+
+<section class="section-pagetop bg">
+	<div class="container">
+		<h2 class="title-page">Checkout</h2>
+	</div> <!-- container //  -->
+</section>
+
+<section class="section-content padding-y">
+	<div class="container">
+
+<div class="row">
+	<main class="col-md-8">
+		<div class="card">
+			<div class="card-header">
+				<h5 class="mb-0">Shipping Address</h5>
+			</div>
+			<div class="card-body">
+
+				{% if form.non_field_errors %}
+					<div class="alert alert-danger">
+						{% for error in form.non_field_errors %}<p class="mb-0">{{ error }}</p>{% endfor %}
+					</div>
+				{% endif %}
+
+				<form action="{% url 'place_order' %}" method="POST">
+					{% csrf_token %}
+					<div class="row">
+						<div class="form-group col-md-6">
+							<label>Full Name</label>
+							{{ form.full_name }}
+							{{ form.full_name.errors }}
+						</div>
+						<div class="form-group col-md-6">
+							<label>Phone</label>
+							{{ form.phone }}
+							{{ form.phone.errors }}
+						</div>
+					</div>
+					<div class="row">
+						<div class="form-group col-md-6">
+							<label>Email</label>
+							{{ form.email }}
+							{{ form.email.errors }}
+						</div>
+						<div class="form-group col-md-6">
+							<label>Pincode</label>
+							{{ form.pincode }}
+							{{ form.pincode.errors }}
+						</div>
+					</div>
+					<div class="form-group">
+						<label>Address Line 1</label>
+						{{ form.address_line_1 }}
+						{{ form.address_line_1.errors }}
+					</div>
+					<div class="form-group">
+						<label>Address Line 2 (optional)</label>
+						{{ form.address_line_2 }}
+					</div>
+					<div class="row">
+						<div class="form-group col-md-4">
+							<label>City</label>
+							{{ form.city }}
+							{{ form.city.errors }}
+						</div>
+						<div class="form-group col-md-4">
+							<label>State</label>
+							{{ form.state }}
+							{{ form.state.errors }}
+						</div>
+						<div class="form-group col-md-4">
+							<label>Country</label>
+							{{ form.country }}
+							{{ form.country.errors }}
+						</div>
+					</div>
+					<button type="submit" class="btn btn-primary btn-block">Place Order</button>
+				</form>
+
+			</div> <!-- card-body.// -->
+		</div> <!-- card.// -->
+	</main> <!-- col.// -->
+
+	<aside class="col-md-4">
+		<div class="card">
+			<div class="card-body">
+				<dl class="dlist-align">
+					<dt>Total price:</dt>
+					<dd class="text-right">${{ total }}</dd>
+				</dl>
+				<dl class="dlist-align">
+					<dt>Tax:</dt>
+					<dd class="text-right">${{ tax }}</dd>
+				</dl>
+				<dl class="dlist-align">
+					<dt>Total:</dt>
+					<dd class="text-right text-dark b"><strong>${{ grand_total }}</strong></dd>
+				</dl>
+				<hr>
+				{% for item in cart_items %}
+				<figure class="itemside mb-3">
+					<div class="aside">
+						{% with images=item.variant.product_color.images.all %}
+							{% with img=images.first %}
+								{% if img %}<img src="{{ img.image.url }}" class="img-sm">{% endif %}
+							{% endwith %}
+						{% endwith %}
+					</div>
+					<figcaption class="info">
+						<p class="mb-0">{{ item.variant.product_color.product.product_name }} ({{ item.variant.color.name }} / {{ item.variant.size.name }})</p>
+						<span class="text-muted">Qty: {{ item.quantity }} x ${{ item.variant.price }}</span>
+					</figcaption>
+				</figure>
+				{% endfor %}
+			</div> <!-- card-body.// -->
+		</div> <!-- card.// -->
+	</aside> <!-- col.// -->
+</div> <!-- row.// -->
+
+	</div> <!-- container .//  -->
+</section>
+
+{% endblock %}

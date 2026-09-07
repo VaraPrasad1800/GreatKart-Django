@@ -2,6 +2,7 @@ from django.db import models
 from category.models import Category
 from django.urls import reverse
 from django.utils.text import slugify
+from accounts.models import Account
 
 # Create your models here.
 
@@ -9,11 +10,14 @@ class Product(models.Model):
     product_name        = models.CharField(max_length=200,unique=True)
     slug                = models.SlugField(max_length=200,unique=True)
     # price               = models.IntegerField()
-    description         = models.TextField(max_length=200)
+    description         = models.TextField(max_length=500)
     # images              = models.ImageField(upload_to='photos/products')
     category            = models.ForeignKey(Category,on_delete=models.CASCADE)
+    brand               = models.CharField(max_length=100, blank=True)
     isAvailable         = models.BooleanField()
     # stock               = models.IntegerField()
+    original_price      = models.PositiveIntegerField(null=True, blank=True)
+    is_on_sale          = models.BooleanField(default=False)
     created_at          = models.DateTimeField(auto_now_add=True)
     modified_at         = models.DateTimeField(auto_now=True)
 
@@ -103,6 +107,32 @@ class ProductImage(models.Model):
 
     def __str__(self):
         return f"{self.product_color}"
+
+
+class Review(models.Model):
+    """
+    A rating + comment on a Product.
+
+    BUSINESS RULE (enforced in ReviewSerializer.validate):
+    a user may only review a product they have actually bought AND whose
+    order has been marked 'Completed' (i.e. delivered) by the admin.
+    One review per user per product.
+    """
+    RATING_CHOICES = [(i, f'{i} star') for i in range(1, 6)]
+
+    user = models.ForeignKey(Account, on_delete=models.CASCADE, related_name='reviews')
+    product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='reviews')
+    rating = models.PositiveSmallIntegerField(choices=RATING_CHOICES)
+    comment = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = ('user', 'product')
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"{self.user.email} - {self.product.product_name} - {self.rating}*"
 
 
 

@@ -61,7 +61,10 @@
 					</select>
 				</div>
 			</div> <!-- row.// -->
-		</form>
+		
+				<a href="{% url 'add_to_wishlist' selected_variant.id %}" class="btn btn-outline-danger">
+					<i class="fa fa-heart"></i> <span class="text">Add to Wishlist</span>
+				</a></form>
 			<hr>
 
 <form action="{% url 'add_cart' selected_variant.id %}" method="POST">

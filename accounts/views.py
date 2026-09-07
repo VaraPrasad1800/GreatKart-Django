@@ -4,6 +4,10 @@ from .models import Account
 from django.contrib.auth import authenticate, login,logout
 from cart.models import CartItem,Cart
 from cart.views import _cart_id
+from rest_framework import generics, status
+from rest_framework.response import Response
+from rest_framework.permissions import AllowAny, IsAuthenticated
+from .serializers import RegisterSerializer, UserSerializer
 
 
 # Create your views here.
@@ -85,3 +89,48 @@ def user_login(request):
 def user_logout(request):
     logout(request)
     return redirect('home')
+
+
+# ============================================================
+# API views (Django REST Framework) - added alongside the
+# existing HTML views above. The HTML pages keep working.
+# ============================================================
+
+class RegisterView(generics.CreateAPIView):
+    """
+    POST /accounts/api/register/
+    Body: {first_name, last_name, phone_number, email, password, confirm_password}
+    """
+    serializer_class = RegisterSerializer
+    permission_classes = [AllowAny]
+
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        user = serializer.save()
+        return Response(
+            {
+                'message': 'Registration successful. Please login.',
+                'user': {
+                    'id': user.id,
+                    'first_name': user.first_name,
+                    'last_name': user.last_name,
+                    'email': user.email,
+                },
+            },
+            status=status.HTTP_201_CREATED,
+        )
+
+
+class UserProfileView(generics.RetrieveAPIView):
+    """
+    GET /accounts/api/profile/  (protected)
+    Header: Authorization: Bearer <access_token>
+    Returns the currently logged-in user. This endpoint proves
+    the JWT authentication is working.
+    """
+    serializer_class = UserSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_object(self):
+        return self.request.user

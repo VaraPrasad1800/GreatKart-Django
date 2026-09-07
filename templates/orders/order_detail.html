@@ -1,0 +1,76 @@
+{% extends 'base.html' %}
+
+{% load static %}
+
+{% block content %}
+
+<section class="section-pagetop bg">
+	<div class="container">
+		<h2 class="title-page">Order {{ order.order_number }}</h2>
+	</div> <!-- container //  -->
+</section>
+
+<section class="section-content padding-y">
+	<div class="container">
+
+<div class="row">
+	<main class="col-md-8">
+		<div class="card">
+			<div class="card-header"><h5 class="mb-0">Items</h5></div>
+			<div class="card-body">
+				{% for item in order_items %}
+				<figure class="itemside border-bottom mb-3 pb-3">
+					<div class="aside">
+						{% with images=item.variant.product_color.images.all %}
+							{% with img=images.first %}
+								{% if img %}<img src="{{ img.image.url }}" class="img-md">{% endif %}
+							{% endwith %}
+						{% endwith %}
+					</div>
+					<figcaption class="info">
+						<p class="mb-0">{{ item.variant.product_color.product.product_name }} ({{ item.variant.product_color.color.name }} / {{ item.variant.size.name }})</p>
+						<span class="text-muted">Qty: {{ item.quantity }} x ${{ item.price }}</span>
+						<div class="price-wrap mt-1"><var class="price">${{ item.subtotal }}</var></div>
+					</figcaption>
+				</figure>
+				{% endfor %}
+			</div> <!-- card-body.// -->
+		</div> <!-- card.// -->
+	</main> <!-- col.// -->
+
+	<aside class="col-md-4">
+		<div class="card mb-3">
+			<div class="card-header"><h6 class="mb-0">Summary</h6></div>
+			<div class="card-body">
+				<dl class="dlist-align">
+					<dt>Total:</dt><dd class="text-right">${{ order.total }}</dd>
+				</dl>
+				<dl class="dlist-align">
+					<dt>Tax:</dt><dd class="text-right">${{ order.tax }}</dd>
+				</dl>
+				<dl class="dlist-align">
+					<dt>Grand Total:</dt><dd class="text-right text-dark b"><strong>${{ order.grand_total }}</strong></dd>
+				</dl>
+				<dl class="dlist-align">
+					<dt>Status:</dt>
+					<dd class="text-right"><span class="badge badge-pill badge-info">{{ order.status }}</span></dd>
+				</dl>
+			</div>
+		</div> <!-- card.// -->
+
+		<div class="card">
+			<div class="card-header"><h6 class="mb-0">Shipping To</h6></div>
+			<div class="card-body">
+				<p class="mb-1"><strong>{{ order.full_name }}</strong></p>
+				<p class="mb-1">{{ order.address_line_1 }} {{ order.address_line_2 }}</p>
+				<p class="mb-1">{{ order.city }}, {{ order.state }} - {{ order.pincode }}</p>
+				<p class="mb-0">{{ order.country }}</p>
+			</div>
+		</div> <!-- card.// -->
+	</aside> <!-- col.// -->
+</div> <!-- row.// -->
+
+	</div> <!-- container .//  -->
+</section>
+
+{% endblock %}

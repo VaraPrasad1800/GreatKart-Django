@@ -19,6 +19,7 @@ from django.urls import path,include
 from . import views
 from django.conf.urls.static import static
 from django.conf import settings
+from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -26,5 +27,12 @@ urlpatterns = [
     path("hello",views.hello,name="hello"),
     path("store/",include('store.urls')),
     path("cart/",include('cart.urls')),
-    path("accounts/",include('accounts.urls'))
+    path("accounts/",include('accounts.urls')),
+    path("category/",include('category.urls')),
+    path("orders/",include('orders.urls')),
+    path("wishlist/",include('wishlist.urls')),
+
+    # ===== JWT auth endpoints (simplejwt built-ins) =====
+    path('api/token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
+    path('api/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
 ] + static(settings.MEDIA_URL,document_root = settings.MEDIA_ROOT)

@@ -148,7 +148,17 @@
     					{% endif %}
 					{% endwith %}
 				</a>
-				
+
+					{% with color=product.first_color %}
+						{% if color and color.variants.first %}
+						{% with variant=color.variants.first %}
+						<a href="{% url 'add_to_wishlist' variant.id %}" class="btn btn-outline-primary btn-icon btn-sm float-right" title="Add to wishlist">
+							<i class="fa fa-heart"></i>
+						</a>
+						{% endwith %}
+						{% endif %}
+					{% endwith %}
+
 			</div> <!-- img-wrap.// -->
 			<figcaption class="info-wrap">
 				<div class="fix-height">

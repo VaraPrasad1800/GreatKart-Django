@@ -1,0 +1,66 @@
+{% extends 'base.html' %}
+
+{% load static %}
+
+{% block content %}
+
+<section class="section-pagetop bg">
+	<div class="container">
+		<h2 class="title-page">My Wishlist</h2>
+	</div> <!-- container //  -->
+</section>
+
+<section class="section-content padding-y">
+	<div class="container">
+
+{% if not wishlist_items %}
+	<h2 class="text-center">Your Wishlist is Empty</h2>
+	<br>
+	<div class="text-center mb-5">
+	<a href="{% url 'store' %}" class="btn btn-primary">
+		Continue Shopping
+	</a>
+	</div>
+{% else %}
+
+<div class="row">
+	{% for item in wishlist_items %}
+	<div class="col-md-4">
+		<figure class="card card-product-grid">
+			<div class="img-wrap">
+				<a href="{{ item.variant.product_color.product.get_url }}" class="img-wrap">
+					{% with images=item.variant.product_color.images.all %}
+						{% with img=images.first %}
+							{% if img %}<img src="{{ img.image.url }}">{% endif %}
+						{% endwith %}
+					{% endwith %}
+				</a>
+			</div> <!-- img-wrap.// -->
+			<figcaption class="info-wrap">
+				<div class="fix-height">
+					<a href="{{ item.variant.product_color.product.get_url }}" class="title">{{ item.variant.product_color.product.product_name }}</a>
+					<div class="price-wrap mt-2">
+						<span class="price">${{ item.variant.price }}</span>
+						<small class="text-muted"> | {{ item.variant.color.name }} / {{ item.variant.size.name }}</small>
+					</div>
+				</div>
+				<div class="row">
+					<a href="{% url 'add_cart' item.variant.id %}" class="btn btn-block btn-primary mb-1">
+						<i class="fa fa-shopping-cart"></i> Add to Cart
+					</a>
+					<a href="{% url 'remove_wishlist' item.variant.id %}" class="btn btn-block btn-outline-danger">
+						<i class="fa fa-heart-broken"></i> Remove
+					</a>
+				</div>
+			</figcaption>
+		</figure>
+	</div> <!-- col.// -->
+	{% endfor %}
+</div> <!-- row end.// -->
+
+{% endif %}
+
+	</div> <!-- container .//  -->
+</section>
+
+{% endblock %}
