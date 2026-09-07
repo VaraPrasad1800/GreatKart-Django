@@ -109,6 +109,53 @@ class ProductImage(models.Model):
         return f"{self.product_color}"
 
 
+class ProductAttribute(models.Model):
+    """
+    Flexible attribute for a product (e.g., material, storage, processor, etc.)
+    Category-specific filters are built from these dynamically.
+    """
+    ATTRIBUTE_TYPES = [
+        ('text', 'Text'),
+        ('number', 'Number'),
+        ('boolean', 'True/False'),
+        ('select', 'Single Select'),
+        ('multiselect', 'Multi Select'),
+    ]
+
+    product = models.ForeignKey(
+        Product,
+        on_delete=models.CASCADE,
+        related_name='attributes'
+    )
+    key = models.CharField(max_length=100)  # e.g., 'material', 'storage', 'processor'
+    label = models.CharField(max_length=100)  # Human-readable label: 'Material', 'Storage'
+    value = models.CharField(max_length=500)  # Stored as string, parsed based on type
+    attribute_type = models.CharField(max_length=20, choices=ATTRIBUTE_TYPES, default='text')
+    is_filterable = models.BooleanField(default=True)  # Show in filter panel
+    display_order = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        ordering = ['display_order', 'key']
+        unique_together = ('product', 'key')
+
+    def __str__(self):
+        return f"{self.product.product_name} - {self.key}: {self.value}"
+
+    @property
+    def parsed_value(self):
+        """Parse value based on attribute_type."""
+        if self.attribute_type == 'number':
+            try:
+                return float(self.value)
+            except ValueError:
+                return None
+        elif self.attribute_type == 'boolean':
+            return self.value.lower() in ('true', '1', 'yes', 'on')
+        elif self.attribute_type in ('select', 'multiselect'):
+            return [v.strip() for v in self.value.split(',') if v.strip()]
+        return self.value
+
+
 class Review(models.Model):
     """
     A rating + comment on a Product.

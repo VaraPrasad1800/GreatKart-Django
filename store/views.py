@@ -1,12 +1,13 @@
-from django.shortcuts import render,get_object_or_404
-from .models import Product,ProductColor,ProductVariant
+from django.shortcuts import render, get_object_or_404
+from .models import Product, ProductColor, ProductVariant, ProductAttribute
 from category.models import Category
 from cart.models import CartItem
 from cart.views import _cart_id
 from django.core.paginator import Paginator
 from django.http import HttpResponse
-from django.db.models import Q, Prefetch
+from django.db.models import Q, Prefetch, Min, Max, Avg, Count
 from rest_framework import generics, filters
+from rest_framework.response import Response
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from .serializers import (
     ProductListSerializer,
@@ -15,39 +16,36 @@ from .serializers import (
 )
 
 # Create your views here.
-def store(request,category_slug = None):
+def store(request, category_slug=None):
     categories = None
     products = None
-    if category_slug != None:
-        categories = get_object_or_404(Category,slug = category_slug)
-        products   = Product.objects.filter(category=categories,isAvailable = True)
-        paginator   = Paginator(products,3)
+    if category_slug is not None:
+        categories = get_object_or_404(Category, slug=category_slug)
+        products = Product.objects.filter(category=categories, isAvailable=True)
+        paginator = Paginator(products, 3)
         page_number = request.GET.get("page")
-        page_obj    = paginator.get_page(page_number)
+        page_obj = paginator.get_page(page_number)
         products_count = products.count()
-    else :
-        products = Product.objects.all().filter(isAvailable = True)
-        paginator   = Paginator(products,3)
+    else:
+        products = Product.objects.all().filter(isAvailable=True)
+        paginator = Paginator(products, 3)
         page_number = request.GET.get("page")
-        page_obj    = paginator.get_page(page_number)
+        page_obj = paginator.get_page(page_number)
         products_count = products.count()
 
-
-    
     context = {
-        'products' : page_obj,
-        'products_count' : products_count,
+        'products': page_obj,
+        'products_count': products_count,
     }
 
-    return render(request,'store/store.html',context)
+    return render(request, 'store/store.html', context)
 
 
-def product_details(request,category_slug,product_slug):
+def product_details(request, category_slug, product_slug):
     try:
-        single_product = Product.objects.get(category__slug = category_slug,slug=product_slug)
-        
+        single_product = Product.objects.get(category__slug=category_slug, slug=product_slug)
 
-        product_colors = ProductColor.objects.filter(product = single_product)
+        product_colors = ProductColor.objects.filter(product=single_product)
 
         color_id = request.GET.get('color')
         variant_id = request.GET.get('variant')
@@ -64,41 +62,41 @@ def product_details(request,category_slug,product_slug):
 
         if variant_id:
             try:
-                selected_variant = variants.get(id = variant_id)
+                selected_variant = variants.get(id=variant_id)
             except ProductVariant.DoesNotExist:
                 selected_variant = variants.first()
         else:
             selected_variant = variants.first()
 
-
-
-        in_cart = CartItem.objects.filter(cart__cart_id = _cart_id(request),variant = selected_variant).exists()
+        in_cart = CartItem.objects.filter(cart__cart_id=_cart_id(request), variant=selected_variant).exists()
     except Exception as e:
         raise e
 
     context = {
-        'single_product' : single_product,
-        'in_cart' : in_cart,
+        'single_product': single_product,
+        'in_cart': in_cart,
         'product_colors': product_colors,
         'selected_color': selected_color,
         'variants': variants,
-        'selected_variant' : selected_variant,
+        'selected_variant': selected_variant,
     }
-    return render(request,'store/product_details.html',context)
+    return render(request, 'store/product_details.html', context)
+
 
 def search(request):
-
     if 'keyword' in request.GET:
         keyword = request.GET['keyword']
         if keyword:
-            products       = Product.objects.order_by('-created_at').filter(Q(description__icontains = keyword) | Q(product_name__icontains = keyword))
+            products = Product.objects.order_by('-created_at').filter(
+                Q(description__icontains=keyword) | Q(product_name__icontains=keyword)
+            )
             products_count = products.count()
 
     context = {
-        'products' : products,
-        'products_count' : products_count,
+        'products': products,
+        'products_count': products_count,
     }
-    return render(request,'store/store.html',context)
+    return render(request, 'store/store.html', context)
 
 
 # ============================================================
@@ -108,22 +106,141 @@ def search(request):
 class ProductListView(generics.ListAPIView):
     """
     GET /store/api/products/
-    - ?category=<slug>   -> filter by category
-    - ?search=<keyword>  -> search product name + description (DRF SearchFilter)
-    - paginated (9/page) -> {"count", "next", "previous", "results": [...]}
+    - ?category=<slug>       -> filter by category
+    - ?search=<keyword>      -> search product name + description
+    - ?brand=<brand>         -> filter by brand (exact match)
+    - ?price_min=<int>       -> minimum price (any variant in range)
+    - ?price_max=<int>       -> maximum price (any variant in range)
+    - ?size=<size_name>      -> filter by size (comma-separated for multiple)
+    - ?color=<color_name>    -> filter by color (comma-separated for multiple)
+    - ?rating_min=<int>      -> minimum average rating (1-5)
+    - ?in_stock=true         -> only products with stock > 0
+    - ?on_sale=true          -> only products on sale
+    - ?sort=price_asc|price_desc|newest|rating|popularity
+    - paginated (9/page)     -> {"count", "next", "previous", "results": [...]}
     Public: anyone can browse products.
     """
     serializer_class = ProductListSerializer
     permission_classes = [AllowAny]
     filter_backends = [filters.SearchFilter]
-    search_fields = ['product_name', 'description']
-
+    search_fields = ['product_name', 'description', 'brand']
 
     def get_queryset(self):
-        products = Product.objects.filter(isAvailable=True)
-        category_slug = self.request.query_params.get('category')
+        # Default ordering keeps pagination stable when no sort is applied.
+        products = Product.objects.filter(isAvailable=True).order_by('-created_at')
+        params = self.request.query_params
+
+        # Category filter
+        category_slug = params.get('category')
         if category_slug:
             products = products.filter(category__slug=category_slug)
+
+        # Brand filter
+        brand = params.get('brand')
+        if brand:
+            products = products.filter(brand__iexact=brand)
+
+        # On sale filter
+        if params.get('on_sale') == 'true':
+            products = products.filter(is_on_sale=True)
+
+        # Rating filter (average rating >= rating_min)
+        rating_min = params.get('rating_min')
+        if rating_min:
+            try:
+                rating_min_val = int(rating_min)
+                products = products.annotate(
+                    avg_rating=Avg('reviews__rating')
+                ).filter(avg_rating__gte=rating_min_val)
+            except ValueError:
+                pass
+
+        # Price range filter (based on variant prices)
+        # "any variant in range" logic: show product if ANY variant price is within [min, max]
+        price_min = params.get('price_min')
+        price_max = params.get('price_max')
+        if price_min or price_max:
+            variant_q = ProductVariant.objects.filter(is_active=True)
+            if price_min:
+                try:
+                    variant_q = variant_q.filter(price__gte=int(price_min))
+                except ValueError:
+                    pass
+            if price_max:
+                try:
+                    variant_q = variant_q.filter(price__lte=int(price_max))
+                except ValueError:
+                    pass
+            # Products that have at least one variant in the price range
+            variant_products = variant_q.values('product_color__product').distinct()
+            products = products.filter(id__in=variant_products)
+
+        # Size filter (comma-separated)
+        size = params.get('size')
+        if size:
+            size_names = [s.strip() for s in size.split(',') if s.strip()]
+            if size_names:
+                size_variants = ProductVariant.objects.filter(
+                    is_active=True,
+                    size__name__in=size_names
+                ).values('product_color__product').distinct()
+                products = products.filter(id__in=size_variants)
+
+        # Color filter (comma-separated)
+        color = params.get('color')
+        if color:
+            color_names = [c.strip() for c in color.split(',') if c.strip()]
+            if color_names:
+                color_products = ProductColor.objects.filter(
+                    color__name__in=color_names
+                ).values('product').distinct()
+                products = products.filter(id__in=color_products)
+
+        # In stock filter (any variant with stock > 0)
+        if params.get('in_stock') == 'true':
+            in_stock_variants = ProductVariant.objects.filter(
+                is_active=True,
+                stock__gt=0
+            ).values('product_color__product').distinct()
+            products = products.filter(id__in=in_stock_variants)
+
+        # Custom attribute filters: ?attr_<key>=<value>
+        # Supports comma-separated values for multiselect
+        for key, value in params.items():
+            if key.startswith('attr_'):
+                attr_key = key[5:]  # Remove 'attr_' prefix
+                if value:
+                    attr_values = [v.strip() for v in value.split(',') if v.strip()]
+                    if attr_values:
+                        attr_products = ProductAttribute.objects.filter(
+                            key=attr_key,
+                            value__in=attr_values,
+                            is_filterable=True
+                        ).values('product').distinct()
+                        products = products.filter(id__in=attr_products)
+
+        # Sorting
+        sort = params.get('sort', '')
+        if sort == 'price_asc':
+            # Annotate with min variant price and order
+            products = products.annotate(
+                min_price=Min('product_colors__variants__price')
+            ).order_by('min_price')
+        elif sort == 'price_desc':
+            products = products.annotate(
+                min_price=Min('product_colors__variants__price')
+            ).order_by('-min_price')
+        elif sort == 'newest':
+            products = products.order_by('-created_at')
+        elif sort == 'rating':
+            products = products.annotate(
+                avg_rating=Avg('reviews__rating')
+            ).order_by('-avg_rating')
+        # 'popularity' would need a sales_count field - skip for now
+
+        # Search (handled by SearchFilter, but we keep it for completeness)
+        # The SearchFilter uses search_fields defined above
+
         return self._optimized(products)
 
     @staticmethod
@@ -137,6 +254,8 @@ class ProductListView(generics.ListAPIView):
                 queryset=ProductVariant.objects.filter(is_active=True),
             ),
             'product_colors__images',
+            'attributes',
+            'reviews',
         )
 
 
@@ -150,8 +269,6 @@ class ProductDetailView(generics.RetrieveAPIView):
     lookup_field = 'slug'
 
     def get_queryset(self):
-        # Same prefetch as the list view, plus the reviews (the detail
-        # serializer embeds them and aggregates a summary).
         return Product.objects.filter(isAvailable=True).select_related('category') \
             .prefetch_related(
                 Prefetch(
@@ -160,6 +277,7 @@ class ProductDetailView(generics.RetrieveAPIView):
                 ),
                 'product_colors__images',
                 'reviews',
+                'attributes',
             )
 
 
@@ -174,7 +292,6 @@ class ProductReviewListCreateView(generics.ListCreateAPIView):
     serializer_class = ReviewSerializer
 
     def get_permissions(self):
-        # GET is public; POST requires a logged-in (JWT) user.
         return [AllowAny()] if self.request.method == 'GET' else [IsAuthenticated()]
 
     def get_product(self):
@@ -184,10 +301,106 @@ class ProductReviewListCreateView(generics.ListCreateAPIView):
         return self.get_product().reviews.all()
 
     def get_serializer_context(self):
-        # Give the serializer the product + request so its validate/create
-        # can enforce the "delivered order required" rule and attach the author.
         context = super().get_serializer_context()
         context['product'] = self.get_product()
-        return context 
+        return context
 
 
+class ProductFilterOptionsView(generics.GenericAPIView):
+    """
+    GET /store/api/products/filter-options/
+    Returns available filter options for the current product set:
+    {
+        "brands": ["Nike", "Adidas", ...],
+        "colors": [{"name": "Red", "hex": "#FF0000", "count": 5}, ...],
+        "sizes": [{"name": "M", "count": 10}, ...],
+        "price_range": {"min": 100, "max": 5000},
+        "attributes": [
+            {"key": "material", "label": "Material", "values": ["Cotton", "Polyester"], "type": "select"}
+        ]
+    }
+    """
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        # Start with base queryset (respects category/search filters)
+        products = Product.objects.filter(isAvailable=True)
+
+        category_slug = request.query_params.get('category')
+        if category_slug:
+            products = products.filter(category__slug=category_slug)
+
+        search = request.query_params.get('search')
+        if search:
+            products = products.filter(
+                Q(product_name__icontains=search) | Q(description__icontains=search)
+            )
+
+        product_ids = products.values_list('id', flat=True)
+
+        # Brands (distinct)
+        brands = list(products.exclude(brand='').values_list('brand', flat=True).distinct())
+
+        # Colors (from ProductColor, with product count)
+        colors = list(ProductColor.objects.filter(product__in=product_ids)
+                      .values('color__name')
+                      .annotate(count=Count('product', distinct=True))
+                      .order_by('-count'))
+
+        # Sizes (from ProductVariant, with product count)
+        sizes = list(ProductVariant.objects.filter(
+            is_active=True,
+            product_color__product__in=product_ids
+        ).values('size__name').annotate(
+            count=Count('product_color__product', distinct=True)
+        ).order_by('size__name'))
+
+        # Price range (from variants)
+        price_agg = ProductVariant.objects.filter(
+            is_active=True,
+            product_color__product__in=product_ids
+        ).aggregate(min_price=Min('price'), max_price=Max('price'))
+
+        # Filterable attributes — group by key to avoid duplicates when label differs
+        from .models import ProductAttribute
+        attributes = []
+        attr_data = ProductAttribute.objects.filter(
+            product__in=product_ids,
+            is_filterable=True
+        ).values('key', 'label', 'attribute_type')
+
+        # Aggregate by key: collect unique labels, types, values
+        from collections import defaultdict
+        by_key = defaultdict(lambda: {'labels': set(), 'types': set(), 'values': set()})
+        for a in attr_data:
+            k = a['key']
+            by_key[k]['labels'].add(a['label'])
+            by_key[k]['types'].add(a['attribute_type'])
+        # Now get values per key
+        for k in by_key:
+            vals = list(ProductAttribute.objects.filter(
+                product__in=product_ids,
+                key=k,
+                is_filterable=True
+            ).values_list('value', flat=True).distinct())
+            by_key[k]['values'] = vals
+
+        for k, v in sorted(by_key.items()):
+            # Use first label/type (they should be consistent per key)
+            attributes.append({
+                'key': k,
+                'label': sorted(v['labels'])[0],
+                'type': sorted(v['types'])[0],
+                'values': v['values'],
+            })
+
+        return Response({
+            'brands': brands,
+            'colors': [{'name': c['color__name'], 'count': c['count']} for c in colors],
+            'sizes': [{'name': s['size__name'], 'count': s['count']} for s in sizes],
+            'price_range': {
+                'min': price_agg['min_price'] or 0,
+                'max': price_agg['max_price'] or 0,
+            },
+            'attributes': attributes,
+        })

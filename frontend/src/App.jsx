@@ -4,6 +4,7 @@ import { AuthProvider } from './context/AuthContext';
 import { CartProvider } from './context/CartContext';
 import { WishlistProvider } from './context/WishlistContext';
 import { ToastProvider } from './context/ToastContext';
+import { FilterProvider } from './context/FilterContext';
 
 import Navbar from './components/Navbar';
 import Footer from './components/Footer';
@@ -30,6 +31,7 @@ export default function App() {
         <CartProvider>
           <WishlistProvider>
             <ToastProvider>
+            <FilterProvider>
               <div className="min-h-screen flex flex-col bg-slate-50 text-slate-900 font-sans selection:bg-blue-600 selection:text-white">
                 <Navbar />
                 <main className="flex-1">
@@ -92,6 +94,7 @@ export default function App() {
                 </main>
                 <Footer />
               </div>
+            </FilterProvider>
             </ToastProvider>
           </WishlistProvider>
         </CartProvider>

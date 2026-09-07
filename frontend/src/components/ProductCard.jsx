@@ -64,6 +64,13 @@ export default function ProductCard({ product }) {
           </span>
         )}
 
+        {/* Sale Badge */}
+        {product.is_on_sale && product.original_price && (
+          <span className="absolute top-10 left-3 bg-rose-600 text-white text-[11px] font-bold px-2.5 py-1 rounded-full shadow-xs">
+            {Math.round((1 - product.price / product.original_price) * 100)}% OFF
+          </span>
+        )}
+
         {/* Wishlist Button */}
         <button
           onClick={handleWishlistToggle}
@@ -106,9 +113,16 @@ export default function ProductCard({ product }) {
         <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between">
           <div>
             <span className="text-xs text-slate-400 block font-medium">Starting at</span>
-            <span className="text-base sm:text-lg font-bold text-slate-900">
-              ${product.price !== null ? product.price : '--'}
-            </span>
+            <div className="flex items-center gap-1.5">
+              <span className="text-base sm:text-lg font-bold text-slate-900">
+                ${product.price !== null ? product.price : '--'}
+              </span>
+              {product.is_on_sale && product.original_price && (
+                <span className="text-xs text-slate-400 line-through">
+                  ${product.original_price}
+                </span>
+              )}
+            </div>
           </div>
 
           <Link

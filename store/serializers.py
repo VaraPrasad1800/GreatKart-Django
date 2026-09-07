@@ -2,7 +2,7 @@ from rest_framework import serializers
 from rest_framework.exceptions import PermissionDenied
 from django.db.models import Avg
 from orders.models import OrderItem
-from .models import Product, ProductColor, ProductVariant, ProductImage, Review
+from .models import Product, ProductColor, ProductVariant, ProductImage, Review, ProductAttribute
 
 
 class VariantSerializer(serializers.ModelSerializer):
@@ -22,9 +22,6 @@ class ProductImageSerializer(serializers.ModelSerializer):
         fields = ['id', 'image', 'is_primary']
 
     def get_image(self, obj):
-        # build_absolute_uri turns a stored path (photos/product/x.jpg) into a
-        # full URL (http://localhost:8000/media/photos/product/x.jpg) so any
-        # client (React, mobile) can load the image directly.
         request = self.context.get('request')
         if request:
             return request.build_absolute_uri(obj.image.url)
@@ -42,6 +39,19 @@ class ProductColorSerializer(serializers.ModelSerializer):
         fields = ['id', 'color', 'images', 'variants']
 
 
+class ProductAttributeSerializer(serializers.ModelSerializer):
+    """Flexible key/value attribute for a product (material, storage, etc.)."""
+    parsed_value = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ProductAttribute
+        fields = ['id', 'key', 'label', 'value', 'attribute_type',
+                  'is_filterable', 'parsed_value']
+
+    def get_parsed_value(self, obj):
+        return obj.parsed_value
+
+
 class ProductListSerializer(serializers.ModelSerializer):
     """Compact view used in product lists/search - one product per item."""
     category = serializers.CharField(source='category.category_name', read_only=True)
@@ -53,16 +63,21 @@ class ProductListSerializer(serializers.ModelSerializer):
     )
     price = serializers.SerializerMethodField()
     image = serializers.SerializerMethodField()
+    brand = serializers.CharField(read_only=True)
+    is_on_sale = serializers.BooleanField(read_only=True)
+    original_price = serializers.IntegerField(read_only=True)
+    review_summary = serializers.SerializerMethodField()
+    attributes = ProductAttributeSerializer(many=True, read_only=True)
 
     class Meta:
         model = Product
         fields = ['id', 'product_name', 'slug', 'description', 'category',
-                  'category_slug', 'price', 'image', 'detail_url']
+                  'category_slug', 'brand', 'price', 'original_price',
+                  'is_on_sale', 'image', 'detail_url', 'review_summary',
+                  'attributes']
 
     def get_price(self, obj):
-        # A product has no price field - price lives on its variants.
-        # The view prefetches active variants; iterate the cached
-        # relations instead of triggering fresh queries.
+        # Iterate prefetched variants from the cache (avoids N+1).
         prices = [
             v.price
             for pc in obj.product_colors.all()
@@ -74,8 +89,6 @@ class ProductListSerializer(serializers.ModelSerializer):
         first_color = obj.product_colors.first()
         if not first_color:
             return None
-        # Iterate prefetched images instead of .filter(...) which would
-        # bypass the cache and hit DB per product.
         images = first_color.images.all()
         img = next((i for i in images if i.is_primary), None) or next(iter(images), None)
         request = self.context.get('request')
@@ -83,14 +96,17 @@ class ProductListSerializer(serializers.ModelSerializer):
             return request.build_absolute_uri(img.image.url) if request else img.image.url
         return None
 
+    def get_review_summary(self, obj):
+        reviews = obj.reviews.all()
+        avg = reviews.aggregate(Avg('rating'))['rating__avg']
+        return {
+            'count': reviews.count(),
+            'average_rating': round(avg, 2) if avg is not None else None,
+        }
+
 
 class ReviewSerializer(serializers.ModelSerializer):
-    """Rating + comment on a product.
-
-    Create validates the business rule in `validate`: only a user whose
-    order for THIS product is marked 'Completed' (delivered) may review,
-    and only once.
-    """
+    """Rating + comment on a product."""
     user_name = serializers.CharField(source='user.first_name', read_only=True)
     product_name = serializers.CharField(source='product.product_name', read_only=True)
 
@@ -102,8 +118,6 @@ class ReviewSerializer(serializers.ModelSerializer):
         product = self.context.get('product')
         user = self.context.get('request').user
 
-        # BUSINESS RULE: must have bought this product AND the order must be
-        # delivered (status 'Completed') before you can review it.
         bought_and_delivered = OrderItem.objects.filter(
             order__user=user,
             variant__product_color__product=product,
@@ -136,11 +150,17 @@ class ProductDetailSerializer(serializers.ModelSerializer):
     product_colors = ProductColorSerializer(many=True, read_only=True)
     reviews = ReviewSerializer(many=True, read_only=True)
     review_summary = serializers.SerializerMethodField()
+    brand = serializers.CharField(read_only=True)
+    is_on_sale = serializers.BooleanField(read_only=True)
+    original_price = serializers.IntegerField(read_only=True)
+    attributes = ProductAttributeSerializer(many=True, read_only=True)
 
     class Meta:
         model = Product
         fields = ['id', 'product_name', 'slug', 'description', 'category',
-                  'product_colors', 'reviews', 'review_summary', 'created_at']
+                  'brand', 'is_on_sale', 'original_price',
+                  'product_colors', 'reviews', 'review_summary',
+                  'attributes', 'created_at']
 
     def get_review_summary(self, obj):
         reviews = obj.reviews.all()

@@ -1,14 +1,20 @@
 import client from './client';
 
 export const productsApi = {
-  // List products with optional category, search, page
-  getProducts: async ({ category = '', search = '', page = 1 } = {}) => {
-    const params = {};
-    if (category) params.category = category;
-    if (search) params.search = search;
-    if (page > 1) params.page = page;
+  // List products with optional category, search, page, and all filter params
+  getProducts: async (params = {}) => {
+    const queryParams = {};
+    Object.entries(params).forEach(([key, value]) => {
+      if (value !== '' && value !== false && value !== null && value !== undefined) {
+        if (Array.isArray(value)) {
+          queryParams[key] = value.join(',');
+        } else {
+          queryParams[key] = value;
+        }
+      }
+    });
 
-    const response = await client.get('/store/api/products/', { params });
+    const response = await client.get('/store/api/products/', { params: queryParams });
     return response.data; // { count, next, previous, results }
   },
 
@@ -31,6 +37,16 @@ export const productsApi = {
       rating,
       comment,
     });
+    return response.data;
+  },
+
+  // Get filter options for current category/search
+  getFilterOptions: async ({ category = '', search = '' } = {}) => {
+    const params = {};
+    if (category) params.category = category;
+    if (search) params.search = search;
+
+    const response = await client.get('/store/api/products/filter-options/', { params });
     return response.data;
   },
 };

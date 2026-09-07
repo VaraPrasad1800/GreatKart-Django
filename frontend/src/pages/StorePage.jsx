@@ -1,149 +1,168 @@
-import React, { useState, useEffect } from 'react';
-import { useSearchParams, Link } from 'react-router-dom';
-import { Filter, Search, X, ChevronLeft, ChevronRight, SlidersHorizontal } from 'lucide-react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { productsApi } from '../api/products';
 import { categoriesApi } from '../api/categories';
 import ProductCard from '../components/ProductCard';
+import { Search, SlidersHorizontal, X, ChevronLeft, ChevronRight } from 'lucide-react';
+import { useFilters } from '../context/FilterContext';
+import FilterPanel from '../components/FilterPanel';
 
 export default function StorePage() {
   const [searchParams, setSearchParams] = useSearchParams();
-  const activeCategory = searchParams.get('category') || '';
-  const activeSearch = searchParams.get('search') || '';
-  const activePage = parseInt(searchParams.get('page') || '1', 10);
-
-  const [products, setProducts] = useState([]);
-  const [categories, setCategories] = useState([]);
-  const [totalCount, setTotalCount] = useState(0);
-  const [loading, setLoading] = useState(true);
-  const [searchInput, setSearchInput] = useState(activeSearch);
   const [mobileFilterOpen, setMobileFilterOpen] = useState(false);
 
-  // Sync search input with URL search param
-  useEffect(() => {
-    setSearchInput(activeSearch);
-  }, [activeSearch]);
+  const {
+    filters,
+    clearFilter,
+    clearAllFilters,
+    activeFilterCount,
+  } = useFilters();
 
-  // Load categories once
+  // Normalize params from URL for display + API calls
+  const activeCategory = filters.category || '';
+  const activeSearch = filters.search || '';
+  const activePage = parseInt(searchParams.get('page') || '1', 10);
+
+  const [categories, setCategories] = useState([]);
+  const [categoriesMap, setCategoriesMap] = useState({});
+  const [products, setProducts] = useState([]);
+  const [totalCount, setTotalCount] = useState(0);
+  const [loading, setLoading] = useState(true);
+
   useEffect(() => {
-    categoriesApi.getCategories().then(setCategories).catch(console.error);
+    categoriesApi.getCategories().then((cats) => {
+      setCategories(cats);
+      setCategoriesMap(Object.fromEntries(cats.map((c) => [c.slug, c])));
+    }).catch(console.error);
   }, []);
 
-  // Fetch products whenever params change
+  // Build API params from filter context
+  const apiParams = useMemo(() => {
+    const p = {
+      page: activePage,
+    };
+    if (activeCategory) p.category = activeCategory;
+    if (activeSearch) p.search = activeSearch;
+    if (filters.brand) p.brand = filters.brand;
+    if (filters.price_min) p.price_min = filters.price_min;
+    if (filters.price_max) p.price_max = filters.price_max;
+    if (filters.size) p.size = filters.size;
+    if (filters.color) p.color = filters.color;
+    if (filters.rating_min) p.rating_min = filters.rating_min;
+    if (filters.in_stock) p.in_stock = filters.in_stock;
+    if (filters.on_sale) p.on_sale = filters.on_sale;
+    if (filters.sort) p.sort = filters.sort;
+
+    // attr_* params
+    Object.entries(filters).forEach(([k, v]) => {
+      if (k.startsWith('attr_')) p[k] = v;
+    });
+    return p;
+  }, [filters, activePage, activeCategory, activeSearch]);
+
   useEffect(() => {
+    let cancelled = false;
     const fetchProducts = async () => {
       try {
         setLoading(true);
-        const data = await productsApi.getProducts({
-          category: activeCategory,
-          search: activeSearch,
-          page: activePage,
-        });
-        setProducts(data.results || []);
-        setTotalCount(data.count || 0);
+        const data = await productsApi.getProducts(apiParams);
+        if (!cancelled) {
+          setProducts(data.results || []);
+          setTotalCount(data.count || 0);
+        }
       } catch (err) {
-        console.error('Failed to load products', err);
+        if (!cancelled) console.error('Failed to load products', err);
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     };
     fetchProducts();
-  }, [activeCategory, activeSearch, activePage]);
-
-  const handleCategorySelect = (slug) => {
-    const params = new URLSearchParams(searchParams);
-    if (slug) {
-      params.set('category', slug);
-    } else {
-      params.delete('category');
-    }
-    params.delete('page'); // Reset to page 1
-    setSearchParams(params);
-    setMobileFilterOpen(false);
-  };
-
-  const handleSearchSubmit = (e) => {
-    e.preventDefault();
-    const params = new URLSearchParams(searchParams);
-    if (searchInput.trim()) {
-      params.set('search', searchInput.trim());
-    } else {
-      params.delete('search');
-    }
-    params.delete('page');
-    setSearchParams(params);
-  };
-
-  const clearFilter = (filterKey) => {
-    const params = new URLSearchParams(searchParams);
-    params.delete(filterKey);
-    params.delete('page');
-    setSearchParams(params);
-    if (filterKey === 'search') setSearchInput('');
-  };
-
-  const clearAllFilters = () => {
-    setSearchParams({});
-    setSearchInput('');
-  };
+    return () => { cancelled = true; };
+  }, [apiParams]);
 
   const totalPages = Math.ceil(totalCount / 9);
 
   const goToPage = (page) => {
-    const params = new URLSearchParams(searchParams);
-    params.set('page', page);
-    setSearchParams(params);
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.set('page', page);
+      return next;
+    });
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
+  const totalPagesDisplay = useMemo(() => Math.max(1, Math.ceil(totalCount / 9)), [totalCount]);
+
+  const categoryLabel = activeCategory ? (categoriesMap[activeCategory]?.category_name || activeCategory) : '';
+  const pageTitle = activeCategory
+    ? `${categoryLabel} Collection`
+    : activeSearch
+    ? `Search Results for "${activeSearch}"`
+    : 'Our Store';
+
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      {/* Top Title & Filters Bar */}
+      {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-6 border-b border-slate-200">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
-            {activeCategory
-              ? `${categories.find((c) => c.slug === activeCategory)?.category_name || activeCategory} Collection`
-              : activeSearch
-              ? `Search Results for "${activeSearch}"`
-              : 'Our Store'}
-          </h1>
+          <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">{pageTitle}</h1>
           <p className="text-sm text-slate-500 mt-1">
-            Showing <span className="font-semibold text-slate-800">{totalCount}</span> items available
+            Showing <span className="font-semibold text-slate-800">{totalCount}</span> items
+            {activeFilterCount > 0 && (
+              <span className="ml-2 text-xs font-semibold text-blue-600">{activeFilterCount} filters active</span>
+            )}
           </p>
         </div>
-
         <div className="flex items-center gap-3">
-          {/* Mobile Filter Trigger */}
           <button
-            onClick={() => setMobileFilterOpen(!mobileFilterOpen)}
+            onClick={() => setMobileFilterOpen(true)}
             className="md:hidden flex items-center gap-2 bg-white border border-slate-200 px-4 py-2 rounded-xl text-sm font-semibold text-slate-700 shadow-xs"
           >
-            <SlidersHorizontal className="w-4 h-4" />
-            Filters
+            <SlidersHorizontal className="w-4 h-4" /> Filters
           </button>
         </div>
       </div>
 
-      {/* Active Filter Tags */}
-      {(activeCategory || activeSearch) && (
+      {/* Active chips from any filter */}
+      {activeFilterCount > 0 && (
         <div className="flex flex-wrap items-center gap-2 py-4">
           <span className="text-xs font-bold uppercase tracking-wider text-slate-400 mr-1">Active:</span>
           {activeCategory && (
-            <span className="inline-flex items-center gap-1.5 bg-blue-50 text-blue-700 border border-blue-200 text-xs font-semibold px-3 py-1 rounded-full">
-              Category: {categories.find((c) => c.slug === activeCategory)?.category_name || activeCategory}
-              <button onClick={() => clearFilter('category')} className="hover:text-blue-900">
-                <X className="w-3.5 h-3.5" />
-              </button>
-            </span>
+            <Chip label={`Category: ${categoryLabel}`} onRemove={() => clearFilter('category')} />
           )}
           {activeSearch && (
-            <span className="inline-flex items-center gap-1.5 bg-indigo-50 text-indigo-700 border border-indigo-200 text-xs font-semibold px-3 py-1 rounded-full">
-              Keyword: "{activeSearch}"
-              <button onClick={() => clearFilter('search')} className="hover:text-indigo-900">
-                <X className="w-3.5 h-3.5" />
-              </button>
-            </span>
+            <Chip label={`Keyword: "${activeSearch}"`} onRemove={() => clearFilter('search')} />
           )}
+          {filters.brand && (
+            <Chip label={`Brand: ${filters.brand}`} onRemove={() => clearFilter('brand')} />
+          )}
+          {filters.price_min && (
+            <Chip label={`Min $${filters.price_min}`} onRemove={() => clearFilter('price_min')} />
+          )}
+          {filters.price_max && (
+            <Chip label={`Max $${filters.price_max}`} onRemove={() => clearFilter('price_max')} />
+          )}
+          {filters.size && filters.size.split(',').filter(Boolean).map((s) => (
+            <Chip key={s} label={`Size: ${s}`} onRemove={() => clearFilter('size')} />
+          ))}
+          {filters.color && filters.color.split(',').filter(Boolean).map((c) => (
+            <Chip key={c} label={`Color: ${c}`} onRemove={() => clearFilter('color')} />
+          ))}
+          {filters.rating_min && (
+            <Chip label={`Rating ${filters.rating_min}+`} onRemove={() => clearFilter('rating_min')} />
+          )}
+          {filters.in_stock && (
+            <Chip label="In Stock" onRemove={() => clearFilter('in_stock')} />
+          )}
+          {filters.on_sale && (
+            <Chip label="On Sale" onRemove={() => clearFilter('on_sale')} />
+          )}
+          {filters.sort && (
+            <Chip label={`Sort: ${filters.sort}`} onRemove={() => clearFilter('sort')} />
+          )}
+          {Object.entries(filters).filter(([k]) => k.startsWith('attr_')).map(([k, v]) => (
+            <Chip key={k} label={`${k.replace('attr_', '')}: ${v}`} onRemove={() => clearFilter(k)} />
+          ))}
           <button
             onClick={clearAllFilters}
             className="text-xs text-rose-600 hover:text-rose-700 font-semibold ml-2 underline"
@@ -153,77 +172,35 @@ export default function StorePage() {
         </div>
       )}
 
-      {/* Main Layout */}
+      {/* Layout */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mt-6">
-        
-        {/* Sidebar Filters */}
-        <aside className={`md:block ${mobileFilterOpen ? 'block mb-6' : 'hidden'} space-y-6`}>
-          {/* Search Widget */}
-          <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs">
-            <h3 className="font-bold text-sm text-slate-900 mb-3 flex items-center gap-2">
-              <Search className="w-4 h-4 text-blue-600" />
-              Search Catalog
-            </h3>
-            <form onSubmit={handleSearchSubmit} className="relative">
-              <input
-                type="text"
-                placeholder="Product name..."
-                value={searchInput}
-                onChange={(e) => setSearchInput(e.target.value)}
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-hidden focus:border-blue-500 focus:bg-white"
-              />
-              <button
-                type="submit"
-                className="mt-2 w-full bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold py-2 rounded-xl transition"
-              >
-                Search
-              </button>
-            </form>
-          </div>
-
-          {/* Categories Filter */}
-          <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs">
-            <h3 className="font-bold text-sm text-slate-900 mb-3 flex items-center gap-2">
-              <Filter className="w-4 h-4 text-blue-600" />
-              Categories
-            </h3>
-            <div className="space-y-1">
-              <button
-                onClick={() => handleCategorySelect('')}
-                className={`w-full text-left px-3 py-2 rounded-xl text-sm font-medium transition ${
-                  !activeCategory
-                    ? 'bg-blue-600 text-white font-semibold shadow-xs'
-                    : 'text-slate-600 hover:bg-slate-50 hover:text-blue-600'
-                }`}
-              >
-                All Categories
-              </button>
-              {categories.map((cat) => {
-                const isSelected = activeCategory === cat.slug;
-                return (
-                  <button
-                    key={cat.id}
-                    onClick={() => handleCategorySelect(cat.slug)}
-                    className={`w-full text-left px-3 py-2 rounded-xl text-sm font-medium transition ${
-                      isSelected
-                        ? 'bg-blue-600 text-white font-semibold shadow-xs'
-                        : 'text-slate-600 hover:bg-slate-50 hover:text-blue-600'
-                    }`}
-                  >
-                    {cat.category_name}
-                  </button>
-                );
-              })}
+        {/* Mobile drawer overlay */}
+        {mobileFilterOpen && (
+          <div className="fixed inset-0 z-40 md:hidden" aria-modal="true">
+            <div className="absolute inset-0 bg-black/30" onClick={() => setMobileFilterOpen(false)} />
+            <div className="absolute inset-y-0 left-0 w-80 bg-white shadow-xl overflow-y-auto p-4">
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-sm font-bold text-slate-900">Filters</h2>
+                <button onClick={() => setMobileFilterOpen(false)} className="text-slate-500 hover:text-slate-900">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              <FilterPanel />
             </div>
           </div>
+        )}
+
+        {/* Desktop sidebar */}
+        <aside className="hidden md:block space-y-6">
+          <FilterPanel />
         </aside>
 
-        {/* Product Grid Area */}
+        {/* Main grid */}
         <main className="md:col-span-3">
           {loading ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
               {[1, 2, 3, 4, 5, 6].map((i) => (
-                <div key={i} className="bg-white rounded-2xl border border-slate-100 p-4 h-80 animate-pulse"></div>
+                <div key={i} className="bg-white rounded-2xl border border-slate-100 p-4 h-80 animate-pulse" />
               ))}
             </div>
           ) : products.length > 0 ? (
@@ -234,7 +211,6 @@ export default function StorePage() {
                 ))}
               </div>
 
-              {/* Pagination */}
               {totalPages > 1 && (
                 <div className="mt-12 flex items-center justify-center gap-2">
                   <button
@@ -244,8 +220,7 @@ export default function StorePage() {
                   >
                     <ChevronLeft className="w-4 h-4" />
                   </button>
-
-                  {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                  {Array.from({ length: totalPagesDisplay }, (_, i) => i + 1).map((page) => (
                     <button
                       key={page}
                       onClick={() => goToPage(page)}
@@ -258,7 +233,6 @@ export default function StorePage() {
                       {page}
                     </button>
                   ))}
-
                   <button
                     disabled={activePage >= totalPages}
                     onClick={() => goToPage(activePage + 1)}
@@ -276,7 +250,7 @@ export default function StorePage() {
               </div>
               <h3 className="text-lg font-bold text-slate-800">No products found</h3>
               <p className="text-sm text-slate-500 max-w-sm mx-auto">
-                We couldn't find any items matching your selected criteria. Try removing filters or searching for another term.
+                No items match your current filters. Try removing or changing filters, or search for a different term.
               </p>
               <button
                 onClick={clearAllFilters}
@@ -287,8 +261,16 @@ export default function StorePage() {
             </div>
           )}
         </main>
-
       </div>
     </div>
+  );
+}
+
+function Chip({ label, onRemove }) {
+  return (
+    <span className="inline-flex items-center gap-1.5 bg-blue-50 text-blue-700 border border-blue-200 text-xs font-semibold px-3 py-1 rounded-full">
+      {label}
+      <button onClick={onRemove} className="hover:text-blue-900"><X className="w-3.5 h-3.5" /></button>
+    </span>
   );
 }
