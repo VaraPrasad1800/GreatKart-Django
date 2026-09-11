@@ -187,6 +187,13 @@ export default function ProductDetailPage() {
   const reviewSummary = product.review_summary || { count: 0, average_rating: 0, rating_breakdown: {} };
   const inStock = selectedVariant ? selectedVariant.stock > 0 : false;
 
+  // A product whose variants all share one dimension value (e.g. "One Size"
+  // for beauty, or groceries' Default x One Size) renders no size selector.
+  const distinctVariantSizes = new Set(
+    (product.product_colors || []).flatMap((c) => c.variants.map((v) => v.size))
+  ).size;
+  const showVariantSelector = distinctVariantSizes > 1;
+
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-12">
       {/* Breadcrumb Navigation */}
@@ -296,8 +303,9 @@ export default function ProductDetailPage() {
             </div>
           </div>
 
-          {/* Color Selector */}
-          {product.product_colors && product.product_colors.length > 0 && (
+          {/* Color Selector — hidden for no-variant categories (groceries/books)
+              whose single collapsed color is the "Default" placeholder. */}
+          {product.has_color && product.product_colors && product.product_colors.length > 0 && (
             <div className="space-y-2.5">
               <label className="block text-xs font-bold uppercase tracking-wider text-slate-500">
                 Color: <span className="text-slate-900 font-semibold">{selectedColor?.color}</span>
@@ -320,11 +328,13 @@ export default function ProductDetailPage() {
             </div>
           )}
 
-          {/* Size Variant Selector */}
-          {selectedColor?.variants && selectedColor.variants.length > 0 && (
+          {/* Size / Storage Variant Selector — hidden when every variant shares
+              the same dimension value ("One Size" products). Label comes from the
+              category config, so phones show "Storage" instead of a wrong "Size". */}
+          {showVariantSelector && selectedColor?.variants && selectedColor.variants.length > 0 && (
             <div className="space-y-2.5">
               <label className="block text-xs font-bold uppercase tracking-wider text-slate-500">
-                Size: <span className="text-slate-900 font-semibold">{selectedVariant?.size}</span>
+                {product.variant_label}: <span className="text-slate-900 font-semibold">{selectedVariant?.size}</span>
               </label>
               <div className="flex flex-wrap gap-2.5">
                 {selectedColor.variants.map((v) => (

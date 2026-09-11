@@ -19,3 +19,51 @@
 html {
   scroll-behavior: smooth;
 }
+
+/* Dual-thumb range slider (FilterPanel Price section).
+   Two full-width range inputs are stacked; the track is drawn by the parent
+   divs, so the inputs themselves are transparent. Only the thumbs receive
+   pointer events, which is what lets both handles be dragged independently. */
+.gk-range {
+  -webkit-appearance: none;
+  appearance: none;
+  position: absolute;
+  top: 50%;
+  left: 0;
+  width: 100%;
+  height: 6px;
+  transform: translateY(-50%);
+  background: transparent;
+  pointer-events: none;
+  margin: 0;
+  outline: none;
+}
+.gk-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  pointer-events: auto;
+  width: 16px;
+  height: 16px;
+  border-radius: 9999px;
+  background: #ffffff;
+  border: 2px solid #2563eb;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+  cursor: grab;
+  transition: box-shadow 0.15s ease;
+}
+.gk-range::-webkit-slider-thumb:hover {
+  box-shadow: 0 2px 6px rgba(37, 99, 235, 0.35);
+}
+.gk-range::-moz-range-thumb {
+  pointer-events: auto;
+  width: 16px;
+  height: 16px;
+  border-radius: 9999px;
+  background: #ffffff;
+  border: 2px solid #2563eb;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+  cursor: grab;
+}
+.gk-range::-moz-range-thumb:hover {
+  box-shadow: 0 2px 6px rgba(37, 99, 235, 0.35);
+}

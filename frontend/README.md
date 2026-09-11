@@ -52,7 +52,7 @@ The frontend will launch at: `http://localhost:5173`.
 
 All requests send and receive pure JSON data:
 - `POST /api/token/`: Obtain JWT `access` and `refresh` tokens
-- `POST /api/token/refresh/`: Refresh expired access tokens
+- `POST /api/token/refresh/`:h e Refresxpired access tokens
 - `POST /accounts/api/register/`: Create new customer account
 - `GET /accounts/api/profile/`: Retrieve current user profile
 - `GET /category/api/categories/`: Fetch categories

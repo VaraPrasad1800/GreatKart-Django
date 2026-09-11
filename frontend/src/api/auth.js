@@ -25,4 +25,32 @@ export const authApi = {
     const response = await client.get('/accounts/api/profile/');
     return response.data; // { id, first_name, last_name, email, phone_number, date_joined }
   },
+
+  // Step 1 (forgot password): request a reset link for an email address.
+  // Always resolves with the same generic message whether or not the account
+  // exists (the backend does not reveal valid addresses).
+  forgotPassword: async (email) => {
+    const response = await client.post('/accounts/api/password-reset/', { email });
+    return response.data; // { message }
+  },
+
+  // Step 1b: verify a reset link (uid + token) is still valid, so the reset
+  // page can show "link expired" before the user types a new password.
+  validateResetToken: async (uid, token) => {
+    const response = await client.get('/accounts/api/password-reset/validate/', {
+      params: { uid, token },
+    });
+    return response.data; // { valid: true }
+  },
+
+  // Step 2: submit the new password with the uid + token from the reset link.
+  resetPassword: async (uid, token, new_password, confirm_password) => {
+    const response = await client.post('/accounts/api/password-reset/confirm/', {
+      uid,
+      token,
+      new_password,
+      confirm_password,
+    });
+    return response.data; // { message }
+  },
 };

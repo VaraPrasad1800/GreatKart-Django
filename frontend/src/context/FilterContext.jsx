@@ -26,6 +26,7 @@ export function FilterProvider({ children }) {
   const filters = useMemo(() => parseFilters(searchParams), [searchParams]);
 
   const [filterOptions, setFilterOptions] = useState({
+    variant_label: 'Size',
     brands: [],
     colors: [],
     sizes: [],

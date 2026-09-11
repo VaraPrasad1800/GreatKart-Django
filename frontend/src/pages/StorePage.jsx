@@ -93,6 +93,37 @@ export default function StorePage() {
 
   const totalPagesDisplay = useMemo(() => Math.max(1, Math.ceil(totalCount / 9)), [totalCount]);
 
+  // Wikipedia-style truncated pagination: window of 5 around current, first/last
+  // always visible, "…" for gaps.  Matches the three spec examples exactly:
+  //   < 1 2 3 4 5 … 23 >         (near start)
+  //   < 1 … 8 9 10 11 12 … 23 >  (middle, current=10)
+  //   < 1 … 19 20 21 22 23 >     (near end)
+  const paginationItems = useMemo(() => {
+    const last = totalPagesDisplay;
+    if (last <= 1) return [1];
+    // Small result sets — show every page, no ellipsis needed.
+    if (last <= 7) return Array.from({ length: last }, (_, i) => i + 1);
+
+    const WIN = 5;
+    const HALF = Math.floor(WIN / 2); // 2
+    let start = Math.max(1, Math.min(activePage - HALF, last - (WIN - 1)));
+    let end = Math.min(last, start + (WIN - 1));
+    // Re-clamp start if end was clamped by `last` (handles current near end)
+    start = Math.max(1, end - (WIN - 1));
+
+    const pages = new Set([1, last]);
+    for (let p = start; p <= end; p++) pages.add(p);
+    const sorted = [...pages].sort((a, b) => a - b);
+
+    // Insert "…" wherever two consecutive visible pages have a gap > 1.
+    const out = [];
+    for (let i = 0; i < sorted.length; i++) {
+      out.push(sorted[i]);
+      if (i + 1 < sorted.length && sorted[i + 1] - sorted[i] > 1) out.push('…');
+    }
+    return out;
+  }, [activePage, totalPagesDisplay]);
+
   const categoryLabel = activeCategory ? (categoriesMap[activeCategory]?.category_name || activeCategory) : '';
   const pageTitle = activeCategory
     ? `${categoryLabel} Collection`
@@ -185,14 +216,14 @@ export default function StorePage() {
                   <X className="w-5 h-5" />
                 </button>
               </div>
-              <FilterPanel />
+              <FilterPanel categories={categories} />
             </div>
           </div>
         )}
 
         {/* Desktop sidebar */}
         <aside className="hidden md:block space-y-6">
-          <FilterPanel />
+          <FilterPanel categories={categories} />
         </aside>
 
         {/* Main grid */}
@@ -220,19 +251,23 @@ export default function StorePage() {
                   >
                     <ChevronLeft className="w-4 h-4" />
                   </button>
-                  {Array.from({ length: totalPagesDisplay }, (_, i) => i + 1).map((page) => (
-                    <button
-                      key={page}
-                      onClick={() => goToPage(page)}
-                      className={`w-10 h-10 rounded-xl text-sm font-semibold transition ${
-                        activePage === page
-                          ? 'bg-blue-600 text-white shadow-md'
-                          : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-50'
-                      }`}
-                    >
-                      {page}
-                    </button>
-                  ))}
+                  {paginationItems.map((page, idx) =>
+                    page === '…' ? (
+                      <span key={`ellipsis-${idx}`} className="w-10 h-10 flex items-center justify-center text-sm text-slate-400 select-none">…</span>
+                    ) : (
+                      <button
+                        key={page}
+                        onClick={() => goToPage(page)}
+                        className={`w-10 h-10 rounded-xl text-sm font-semibold transition ${
+                          activePage === page
+                            ? 'bg-blue-600 text-white shadow-md'
+                            : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-50'
+                        }`}
+                      >
+                        {page}
+                      </button>
+                    )
+                  )}
                   <button
                     disabled={activePage >= totalPages}
                     onClick={() => goToPage(activePage + 1)}
